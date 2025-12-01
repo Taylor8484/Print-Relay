@@ -36,6 +36,7 @@ WORKDIR /app
 
 # Copy backend package file and install dependencies
 COPY server-package.json ./package.json
+COPY server-package-lock.json ./package-lock.json
 RUN npm ci --only=production
 
 # Copy the Express server
