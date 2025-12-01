@@ -43,8 +43,8 @@ Built with React, TypeScript, and Express.js, PrintRelay provides a clean web in
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/Taylor8484/PrintRelay
-cd PrintRelay
+git clone https://github.com/Taylor8484/Print-Relay
+cd Print-Relay
 ```
 
 ### 2. Build the Docker Image
