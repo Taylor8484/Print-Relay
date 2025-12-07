@@ -274,7 +274,7 @@ v1.1.0 - Advanced Printing Options
 **Docker Compose:**
 ```bash
 wget https://raw.githubusercontent.com/Taylor8484/Print-Relay/main/docker-compose.prebuilt.yml
-docker-compose -f docker-compose.prebuilt.yml up -d
+docker compose -f docker-compose.prebuilt.yml up -d
 ```
 
 **Docker CLI:**
@@ -294,7 +294,7 @@ docker run -d \
 git clone https://github.com/Taylor8484/Print-Relay
 cd Print-Relay
 git checkout v1.1.0
-docker-compose up -d
+docker compose up -d
 ```
 
 ## Upgrading from v1.0.0

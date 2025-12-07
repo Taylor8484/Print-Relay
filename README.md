@@ -41,6 +41,8 @@ Built with React, TypeScript, and Express.js, PrintRelay provides a clean web in
 
 ## Quick Start with Docker
 
+> **Note:** This guide uses `docker compose` (modern Docker CLI plugin). If you have the older standalone tool, use `docker-compose` (with hyphen) instead.
+
 Choose between using **pre-built images** (fastest) or **building from source** (most up-to-date):
 
 ### Option A: Pre-Built Image (Fastest ⚡)
@@ -53,7 +55,7 @@ No build required - just pull and run the latest published image:
 wget https://raw.githubusercontent.com/Taylor8484/Print-Relay/main/docker-compose.prebuilt.yml
 
 # Start PrintRelay
-docker-compose -f docker-compose.prebuilt.yml up -d
+docker compose -f docker-compose.prebuilt.yml up -d
 ```
 
 **Using Docker CLI:**
@@ -82,7 +84,7 @@ cd Print-Relay
 
 **2. Deploy with Docker Compose**
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 **That's it!** Docker Compose will build and start PrintRelay with:
@@ -131,7 +133,7 @@ Simply pull the latest image and restart:
 docker pull ghcr.io/taylor8484/print-relay:latest
 
 # Restart the container
-docker-compose -f docker-compose.prebuilt.yml up -d
+docker compose -f docker-compose.prebuilt.yml up -d
 
 # Or with Docker CLI
 docker stop printrelay && docker rm printrelay
@@ -172,13 +174,13 @@ cd /path/to/Print-Relay
 git pull origin main
 
 # Rebuild and restart
-docker-compose down
-docker-compose build --no-cache
-docker-compose up -d
+docker compose down
+docker compose build --no-cache
+docker compose up -d
 
 # Verify it's running
-docker-compose ps
-docker-compose logs -f
+docker compose ps
+docker compose logs -f
 ```
 
 ### Method 3: Docker CLI (Manual)
@@ -263,14 +265,14 @@ git pull origin main
 - Check file permissions: `chmod +x update.sh`
 
 **Container won't start after update:**
-- Check logs: `docker-compose logs` or `docker logs printrelay`
+- Check logs: `docker compose logs` or `docker logs printrelay`
 - Verify CUPS is running: `systemctl status cups`
 - Ensure ports aren't in use: `sudo lsof -i :5000`
 
 **Configuration lost after update:**
 - Check if `printer-config` directory exists in your PrintRelay folder
 - Verify the volume mount in your docker-compose.yml or run command
-- Re-mount the volume and restart: `docker-compose down && docker-compose up -d`
+- Re-mount the volume and restart: `docker compose down && docker compose up -d`
 
 ---
 
@@ -511,7 +513,7 @@ Before exposing PrintRelay remotely, ensure:
 
 **For Docker Compose deployment (recommended):**
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 **For Docker CLI deployment (with mDNS):**
@@ -588,13 +590,13 @@ The easiest deployment method is using Docker Compose:
 
 ```bash
 # Build and start in one command
-docker-compose up -d
+docker compose up -d
 
 # View logs
-docker-compose logs -f
+docker compose logs -f
 
 # Stop
-docker-compose down
+docker compose down
 ```
 
 ### Docker CLI (Alternative)
