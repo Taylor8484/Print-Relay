@@ -278,190 +278,337 @@ git pull origin main
 
 ## Remote Access & Deployment Beyond Local Network
 
-⚠️ **Security First:** PrintRelay currently has no built-in authentication. When deploying for remote access, you **must** implement security measures to prevent unauthorized access to your printers.
+⚠️ **Security First:** PrintRelay currently has no built-in authentication. When deploying for remote access over the internet, you **must** implement security measures to prevent unauthorized access to your printers.
 
-### Option 1: VPN or Tailscale (Recommended)
+### Option 1: Cloudflare Tunnel (Recommended for Internet Access)
 
-The most secure approach is to keep PrintRelay on your local network and access it through a VPN.
+Cloudflare Tunnel (formerly Argo Tunnel) is ideal for exposing PrintRelay over the internet without opening firewall ports. It provides automatic HTTPS, DDoS protection, and optional Zero Trust authentication.
 
-#### Using Tailscale (Easiest)
+#### Installation
 
-[Tailscale](https://tailscale.com/) creates a secure mesh network between your devices:
+Choose the installation method for your Linux distribution:
 
-1. **Install Tailscale on the host machine:**
-   ```bash
-   curl -fsSL https://tailscale.com/install.sh | sh
-   sudo tailscale up
-   ```
-
-2. **Deploy PrintRelay normally:**
-   ```bash
-   docker run -d \
-     --network=host \
-     -v /var/run/cups:/var/run/cups \
-     --name printrelay \
-     printrelay
-   ```
-
-3. **Access from any Tailscale-connected device:**
-   ```
-   http://<tailscale-ip>:5000
-   # Find your Tailscale IP: tailscale ip -4
-   ```
-
-**Benefits:**
-- End-to-end encryption
-- No exposed public ports
-- Works anywhere (home, office, mobile)
-- Free for personal use (up to 100 devices)
-- No firewall configuration needed
-
-#### Using Traditional VPN (WireGuard, OpenVPN)
-
-If you prefer self-hosted VPN solutions:
-
-1. Set up WireGuard or OpenVPN on your network
-2. Deploy PrintRelay on the local network
-3. Connect to VPN from remote devices
-4. Access via local IP: `http://192.168.1.x:5000`
-
-### Option 2: Reverse Proxy with Authentication
-
-If you need web-accessible deployment without VPN, use a reverse proxy with authentication.
-
-#### Using Nginx with Basic Auth
-
-1. **Create password file:**
-   ```bash
-   sudo apt install apache2-utils
-   sudo htpasswd -c /etc/nginx/.htpasswd printuser
-   ```
-
-2. **Configure Nginx:**
-   ```nginx
-   server {
-       listen 80;
-       server_name print.yourdomain.com;
-
-       location / {
-           auth_basic "PrintRelay Access";
-           auth_basic_user_file /etc/nginx/.htpasswd;
-
-           proxy_pass http://localhost:5000;
-           proxy_set_header Host $host;
-           proxy_set_header X-Real-IP $remote_addr;
-           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-           proxy_set_header X-Forwarded-Proto $scheme;
-       }
-   }
-   ```
-
-3. **Add SSL with Let's Encrypt:**
-   ```bash
-   sudo certbot --nginx -d print.yourdomain.com
-   ```
-
-4. **Run PrintRelay (without host network):**
-   ```bash
-   docker run -d \
-     -p 127.0.0.1:5000:5000 \
-     -v /var/run/cups:/var/run/cups \
-     --name printrelay \
-     printrelay
-   ```
-
-**Benefits:**
-- HTTPS encryption
-- Password protection
-- Access from anywhere via domain name
-- Can integrate with SSO/OAuth
-
-**Considerations:**
-- Requires domain name and SSL certificate
-- Need to manage user credentials
-- Exposed to internet (ensure strong passwords)
-
-#### Using Caddy (Simpler Alternative)
-
-Caddy provides automatic HTTPS with a simpler configuration:
-
-```caddyfile
-print.yourdomain.com {
-    basicauth {
-        printuser $2a$14$Zkx19XLiW6VYouLHR5NmfOFU0z2GTNmpkT/5qqR7hx6e
-    }
-    reverse_proxy localhost:5000
-}
+**Debian/Ubuntu:**
+```bash
+wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+sudo dpkg -i cloudflared-linux-amd64.deb
 ```
 
-### Option 3: Cloudflare Tunnel (Zero Trust)
+**RHEL/CentOS/Fedora:**
+```bash
+wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-x86_64.rpm
+sudo rpm -i cloudflared-linux-x86_64.rpm
+```
 
-Cloudflare Tunnel (formerly Argo Tunnel) exposes your service without opening firewall ports.
+**Arch Linux:**
+```bash
+yay -S cloudflared
+# or
+paru -S cloudflared
+```
+
+**Other distributions (using binary):**
+```bash
+wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+sudo mv cloudflared-linux-amd64 /usr/local/bin/cloudflared
+sudo chmod +x /usr/local/bin/cloudflared
+```
 
 #### Setup Steps
 
-1. **Install cloudflared:**
-   ```bash
-   wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
-   sudo dpkg -i cloudflared-linux-amd64.deb
-   ```
-
-2. **Authenticate with Cloudflare:**
+1. **Authenticate with Cloudflare:**
    ```bash
    cloudflared tunnel login
    ```
+   This opens a browser window. Log in and authorize the tunnel.
 
-3. **Create a tunnel:**
+2. **Create a tunnel:**
    ```bash
    cloudflared tunnel create printrelay
    ```
+   Note the tunnel ID shown in the output.
 
-4. **Configure the tunnel** (`~/.cloudflared/config.yml`):
+3. **Configure the tunnel** (`~/.cloudflared/config.yml`):
    ```yaml
-   tunnel: <tunnel-id>
-   credentials-file: /home/user/.cloudflared/<tunnel-id>.json
+   tunnel: <tunnel-id-from-step-2>
+   credentials-file: /home/YOUR_USERNAME/.cloudflared/<tunnel-id>.json
 
    ingress:
      - hostname: print.yourdomain.com
        service: http://localhost:5000
      - service: http_status:404
    ```
+   Replace `YOUR_USERNAME` and `<tunnel-id>` with your values.
 
-5. **Route DNS:**
+4. **Route DNS to your tunnel:**
    ```bash
    cloudflared tunnel route dns printrelay print.yourdomain.com
    ```
 
-6. **Run the tunnel:**
+5. **Run the tunnel:**
    ```bash
    cloudflared tunnel run printrelay
    ```
 
-7. **Add Cloudflare Access (recommended):**
-   - Go to Cloudflare Zero Trust dashboard
-   - Create an Access application for `print.yourdomain.com`
-   - Configure authentication (email OTP, Google, GitHub, etc.)
+6. **Make it persistent (run as a service):**
+   ```bash
+   sudo cloudflared service install
+   sudo systemctl enable cloudflared
+   sudo systemctl start cloudflared
+   ```
+
+7. **Add Cloudflare Access for authentication (HIGHLY recommended):**
+   - Go to [Cloudflare Zero Trust dashboard](https://one.dash.cloudflare.com/)
+   - Navigate to Access → Applications → Add an application
+   - Choose "Self-hosted"
+   - Application domain: `print.yourdomain.com`
+   - Configure authentication method:
+     - **One-time PIN** (email-based, free)
+     - **Google/GitHub OAuth** (social login)
+     - **Okta/Azure AD** (enterprise SSO)
+   - Create access policies (e.g., allow specific email addresses)
 
 **Benefits:**
-- No port forwarding required
-- Free tier available
-- DDoS protection included
-- Can add Zero Trust authentication
-- Automatic HTTPS
+- ✅ No port forwarding required
+- ✅ Automatic HTTPS with Cloudflare SSL
+- ✅ DDoS protection included
+- ✅ Zero Trust authentication available
+- ✅ Free tier supports this use case
+- ✅ Works behind NAT/CGNAT
+- ✅ No need to expose your home IP address
 
 **Considerations:**
-- Requires Cloudflare account and domain
-- Traffic routes through Cloudflare
-- Slight latency added
+- Requires Cloudflare account and domain (free tier available)
+- Traffic routes through Cloudflare (slight latency, ~10-50ms)
+- Subject to Cloudflare's terms of service
+
+### Option 2: Reverse Proxy with Authentication
+
+If you have a static IP or port forwarding available, you can use a traditional reverse proxy with authentication.
+
+#### Using Nginx with Basic Auth
+
+**1. Install Nginx and Apache utilities:**
+
+**Debian/Ubuntu:**
+```bash
+sudo apt update
+sudo apt install nginx apache2-utils
+```
+
+**RHEL/CentOS/Fedora:**
+```bash
+sudo dnf install nginx httpd-tools
+```
+
+**Arch Linux:**
+```bash
+sudo pacman -S nginx apache
+```
+
+**2. Create password file:**
+```bash
+sudo htpasswd -c /etc/nginx/.htpasswd printuser
+```
+Enter a strong password when prompted.
+
+**3. Configure Nginx** (`/etc/nginx/sites-available/printrelay` or `/etc/nginx/conf.d/printrelay.conf`):
+```nginx
+server {
+    listen 80;
+    server_name print.yourdomain.com;
+
+    location / {
+        auth_basic "PrintRelay Access";
+        auth_basic_user_file /etc/nginx/.htpasswd;
+
+        proxy_pass http://localhost:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+**4. Enable the site (Debian/Ubuntu):**
+```bash
+sudo ln -s /etc/nginx/sites-available/printrelay /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+**5. Add SSL with Let's Encrypt:**
+
+**Debian/Ubuntu:**
+```bash
+sudo apt install certbot python3-certbot-nginx
+sudo certbot --nginx -d print.yourdomain.com
+```
+
+**RHEL/CentOS/Fedora:**
+```bash
+sudo dnf install certbot python3-certbot-nginx
+sudo certbot --nginx -d print.yourdomain.com
+```
+
+**Arch Linux:**
+```bash
+sudo pacman -S certbot certbot-nginx
+sudo certbot --nginx -d print.yourdomain.com
+```
+
+**6. Run PrintRelay (bind to localhost only):**
+```bash
+docker run -d \
+  -p 127.0.0.1:5000:5000 \
+  -v /var/run/cups:/var/run/cups \
+  -v $(pwd)/printer-config:/app/printer-config \
+  --name printrelay \
+  ghcr.io/taylor8484/print-relay:latest
+```
+
+**Benefits:**
+- ✅ HTTPS encryption
+- ✅ Password protection
+- ✅ Full control over server
+- ✅ Can integrate with SSO/OAuth (via Nginx modules)
+- ✅ No third-party dependencies
+
+**Considerations:**
+- ⚠️ Requires domain name and SSL certificate
+- ⚠️ Need to manage user credentials
+- ⚠️ Requires static IP or port forwarding
+- ⚠️ You're responsible for security updates
+- ⚠️ Exposed to internet attacks (use fail2ban, rate limiting)
+
+#### Using Caddy (Simpler Alternative)
+
+Caddy provides automatic HTTPS with a simpler configuration.
+
+**1. Install Caddy:**
+
+**Debian/Ubuntu:**
+```bash
+sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+sudo apt update
+sudo apt install caddy
+```
+
+**RHEL/Fedora:**
+```bash
+dnf install 'dnf-command(copr)'
+dnf copr enable @caddy/caddy
+dnf install caddy
+```
+
+**Arch Linux:**
+```bash
+sudo pacman -S caddy
+```
+
+**2. Create password hash:**
+```bash
+caddy hash-password
+```
+Enter your password and copy the hash.
+
+**3. Configure Caddy** (`/etc/caddy/Caddyfile`):
+```caddyfile
+print.yourdomain.com {
+    basicauth {
+        printuser <paste-hashed-password-here>
+    }
+    reverse_proxy localhost:5000
+}
+```
+
+**4. Reload Caddy:**
+```bash
+sudo systemctl reload caddy
+```
+
+Caddy automatically obtains and renews SSL certificates from Let's Encrypt!
+
+### Option 3: VPN or Tailscale (Private Network)
+
+For private access (not public internet), VPN solutions provide the highest security by keeping PrintRelay completely off the public internet.
+
+#### Using Tailscale (Easiest)
+
+[Tailscale](https://tailscale.com/) creates a secure mesh network between your devices with zero configuration.
+
+**1. Install Tailscale:**
+```bash
+curl -fsSL https://tailscale.com/install.sh | sh
+```
+This works on most Linux distributions (Debian, Ubuntu, Fedora, Arch, etc.).
+
+**2. Authenticate:**
+```bash
+sudo tailscale up
+```
+Follow the link to log in.
+
+**3. Deploy PrintRelay normally:**
+```bash
+docker run -d \
+  --network=host \
+  -v /var/run/cups:/var/run/cups \
+  -v $(pwd)/printer-config:/app/printer-config \
+  --name printrelay \
+  ghcr.io/taylor8484/print-relay:latest
+```
+
+**4. Access from any Tailscale-connected device:**
+```
+http://<tailscale-ip>:5000
+```
+Find your Tailscale IP: `tailscale ip -4`
+
+**Benefits:**
+- ✅ End-to-end encryption (WireGuard-based)
+- ✅ No exposed public ports
+- ✅ Works anywhere (home, office, mobile, behind CGNAT)
+- ✅ Free for personal use (up to 100 devices)
+- ✅ Zero configuration needed
+- ✅ Works across NAT/firewalls
+
+**Considerations:**
+- ⚠️ Requires Tailscale account (free)
+- ⚠️ Devices must have Tailscale installed
+- ⚠️ Not suitable for public/guest access
+
+#### Using Traditional VPN (WireGuard, OpenVPN)
+
+If you prefer self-hosted VPN solutions for complete control:
+
+1. Set up WireGuard or OpenVPN on your network
+2. Deploy PrintRelay on the local network
+3. Connect to VPN from remote devices
+4. Access via local IP: `http://192.168.1.x:5000`
+
+**Benefits:**
+- ✅ Complete control over infrastructure
+- ✅ No third-party services
+- ✅ Network-level security
+
+**Considerations:**
+- ⚠️ Complex setup and maintenance
+- ⚠️ Requires VPN server configuration
+- ⚠️ Manual client configuration
 
 ### Comparison Table
 
 | Method | Security | Complexity | Cost | Best For |
 |--------|----------|------------|------|----------|
-| **Tailscale** | ⭐⭐⭐⭐⭐ | ⭐ Easy | Free* | Personal use, small teams |
-| **Traditional VPN** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ Hard | Free | Full network access needed |
-| **Nginx + Auth** | ⭐⭐⭐ Medium | ⭐⭐⭐ Medium | Domain cost | Web-only access |
-| **Cloudflare Tunnel** | ⭐⭐⭐⭐ High | ⭐⭐ Medium | Free* | No port forwarding, Zero Trust |
+| **Cloudflare Tunnel** | ⭐⭐⭐⭐ High | ⭐⭐ Medium | Free* | Internet printing, no port forwarding, Zero Trust auth |
+| **Nginx + Auth** | ⭐⭐⭐ Medium | ⭐⭐⭐ Medium | Domain cost | Full control, static IP available |
+| **Caddy + Auth** | ⭐⭐⭐ Medium | ⭐⭐ Easy | Domain cost | Automatic HTTPS, simpler config |
+| **Tailscale** | ⭐⭐⭐⭐⭐ | ⭐ Easy | Free* | Private network, personal/team use |
+| **Traditional VPN** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ Hard | Free | Corporate environments, full control |
 
 *Free tiers available with limitations
 
@@ -469,28 +616,35 @@ Cloudflare Tunnel (formerly Argo Tunnel) exposes your service without opening fi
 
 Before exposing PrintRelay remotely, ensure:
 
-- [ ] **Authentication is enabled** (basic auth, VPN, or Zero Trust)
-- [ ] **HTTPS is configured** (if using reverse proxy)
-- [ ] **Strong passwords are used** (minimum 16 characters)
+- [ ] **Authentication is enabled** (Cloudflare Access, basic auth, VPN, or Zero Trust)
+- [ ] **HTTPS is configured** (automatic with Cloudflare/Caddy, manual with Nginx)
+- [ ] **Strong passwords are used** (minimum 16 characters if using basic auth)
+- [ ] **Access policies are configured** (restrict by email/IP if using Cloudflare Access)
 - [ ] **Rate limiting is configured** (prevent brute force attacks)
 - [ ] **Logs are monitored** (watch for suspicious activity)
-- [ ] **CUPS permissions are reviewed** (restrict printer access)
+- [ ] **CUPS permissions are reviewed** (restrict printer access on host)
 - [ ] **File upload limits are appropriate** (default: 50MB)
-- [ ] **Network firewall rules are configured** (allow only necessary ports)
+- [ ] **Network firewall rules are configured** (if using Nginx, allow only 80/443)
 
 ### Recommendations by Use Case
 
-**Home/Personal Use:**
-→ Use **Tailscale** for simplicity and security
+**Printing from Anywhere Over Internet:**
+→ Use **Cloudflare Tunnel** with Access authentication - No port forwarding, built-in DDoS protection
 
-**Small Office/Team:**
-→ Use **Tailscale** or **Cloudflare Tunnel** with Access policies
+**Home/Personal Use (Private Network):**
+→ Use **Tailscale** - Simplest setup, highest security, works behind CGNAT
 
-**Public Access Needed:**
-→ Use **Nginx with authentication** or **Cloudflare Tunnel** with strict Access rules
+**Small Office/Team (Internet Access):**
+→ Use **Cloudflare Tunnel** with email-based Access policies or OAuth
+
+**Static IP Available + Want Full Control:**
+→ Use **Nginx** or **Caddy** with basic auth and Let's Encrypt SSL
 
 **Corporate Environment:**
-→ Use **Traditional VPN** with existing infrastructure
+→ Use **Traditional VPN** with existing infrastructure or **Tailscale** for simpler management
+
+**Guest/Public Access Needed:**
+→ Use **Cloudflare Tunnel** with one-time PIN authentication (least friction for users)
 
 ---
 
