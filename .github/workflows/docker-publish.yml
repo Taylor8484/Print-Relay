@@ -43,16 +43,17 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            # Tag as 'latest' for main branch
+            # Tag as 'latest' for main branch and version tags
             type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
             # Tag with version for tags (e.g., v1.0.0 -> 1.0.0)
             type=semver,pattern={{version}}
             # Tag with major.minor for tags (e.g., v1.0.0 -> 1.0)
             type=semver,pattern={{major}}.{{minor}}
             # Tag with major for tags (e.g., v1.0.0 -> 1)
             type=semver,pattern={{major}}
-            # Tag with git short SHA for all builds
-            type=sha,prefix={{branch}}-
+            # Tag with git short SHA for main branch pushes only
+            type=sha,prefix=main-,enable={{is_default_branch}}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
