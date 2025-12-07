@@ -109,6 +109,18 @@ const MoonIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   </svg>
 );
 
+const ChevronDownIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <polyline points="6 9 12 15 18 9"></polyline>
+  </svg>
+);
+
+const ChevronUpIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <polyline points="18 15 12 9 6 15"></polyline>
+  </svg>
+);
+
 const ThemeToggle: React.FC = memo(() => {
   const { theme, toggleTheme } = useTheme();
 
@@ -268,6 +280,7 @@ PrinterSelector.displayName = 'PrinterSelector';
 
 const PrintForm: React.FC<{ onSubmit: (e: React.FormEvent<HTMLFormElement>) => void; isLoading: boolean; fileInputRef: React.RefObject<HTMLInputElement> }> = memo(({ onSubmit, isLoading, fileInputRef }) => {
   const [fileName, setFileName] = useState<string | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
 
   const handleFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files.length > 0) {
@@ -283,6 +296,10 @@ const PrintForm: React.FC<{ onSubmit: (e: React.FormEvent<HTMLFormElement>) => v
       setFileName(null);
     }
   }, [fileInputRef]);
+
+  const toggleAdvanced = useCallback(() => {
+    setShowAdvanced(prev => !prev);
+  }, []);
 
   useEffect(() => {
     if (fileInputRef.current) {
@@ -325,6 +342,53 @@ const PrintForm: React.FC<{ onSubmit: (e: React.FormEvent<HTMLFormElement>) => v
         <div className="mt-1">
           <CustomNumberInput name="copies" id="copies" defaultValue={1} min={1} required />
         </div>
+      </div>
+      <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
+        <button
+          type="button"
+          onClick={toggleAdvanced}
+          className="flex items-center justify-between w-full text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 transition-colors duration-200"
+          aria-expanded={showAdvanced}
+        >
+          <span>Advanced Options</span>
+          {showAdvanced ? <ChevronUpIcon /> : <ChevronDownIcon />}
+        </button>
+        {showAdvanced && (
+          <div className="mt-4 space-y-4">
+            <div>
+              <label htmlFor="duplex" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                Double-Sided Printing
+              </label>
+              <select
+                id="duplex"
+                name="duplex"
+                defaultValue="one-sided"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="one-sided">One-Sided</option>
+                <option value="two-sided-long-edge">Two-Sided (Long Edge)</option>
+                <option value="two-sided-short-edge">Two-Sided (Short Edge)</option>
+              </select>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Long edge for portrait, short edge for landscape
+              </p>
+            </div>
+            <div>
+              <label htmlFor="orientation" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                Orientation
+              </label>
+              <select
+                id="orientation"
+                name="orientation"
+                defaultValue="portrait"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="portrait">Portrait</option>
+                <option value="landscape">Landscape</option>
+              </select>
+            </div>
+          </div>
+        )}
       </div>
       <div>
         <button type="submit" disabled={isLoading} className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400 disabled:cursor-not-allowed transition-colors duration-200">

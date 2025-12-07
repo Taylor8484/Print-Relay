@@ -172,9 +172,29 @@ app.post('/api/print', upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: 'Copies must be between 1 and 999' });
     }
 
+    // Get advanced options (with defaults)
+    const duplex = req.body.duplex || 'one-sided';
+    const orientation = req.body.orientation || 'portrait';
+
+    // Build CUPS options
+    const cupsOptions = [];
+
+    // Add duplex option
+    if (['one-sided', 'two-sided-long-edge', 'two-sided-short-edge'].includes(duplex)) {
+      cupsOptions.push(`-o sides=${duplex}`);
+    }
+
+    // Add orientation option
+    if (orientation === 'landscape') {
+      cupsOptions.push('-o orientation-requested=4');
+    } else {
+      cupsOptions.push('-o orientation-requested=3');
+    }
+
     // Build lp command
     const filePath = req.file.path;
-    const command = `lp -d "${printerName}" -n ${copies} "${filePath}"`;
+    const optionsString = cupsOptions.join(' ');
+    const command = `lp -d "${printerName}" -n ${copies} ${optionsString} "${filePath}"`;
 
     console.log(`Executing print command: ${command}`);
 
@@ -194,7 +214,9 @@ app.post('/api/print', upload.single('file'), async (req, res) => {
       jobId,
       printer: printerName,
       copies,
-      fileName: req.file.originalname
+      fileName: req.file.originalname,
+      duplex,
+      orientation
     });
 
   } catch (error) {

@@ -26,3 +26,6 @@ dist-ssr
 # Claude Code
 .claude/
 CLAUDE.md
+
+# Persistent printer configuration (local only)
+printer-config/

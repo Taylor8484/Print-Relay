@@ -41,29 +41,73 @@ Built with React, TypeScript, and Express.js, PrintRelay provides a clean web in
 
 ## Quick Start with Docker
 
-### 1. Clone the Repository
+Choose between using **pre-built images** (fastest) or **building from source** (most up-to-date):
+
+### Option A: Pre-Built Image (Fastest ⚡)
+
+No build required - just pull and run the latest published image:
+
+**Using Docker Compose:**
+```bash
+# Download the pre-built compose file
+wget https://raw.githubusercontent.com/Taylor8484/Print-Relay/main/docker-compose.prebuilt.yml
+
+# Start PrintRelay
+docker-compose -f docker-compose.prebuilt.yml up -d
+```
+
+**Using Docker CLI:**
+```bash
+# Create config directory
+mkdir -p printer-config
+
+# Pull and run the latest image
+docker run -d \
+  --network=host \
+  -v /var/run/cups:/var/run/cups \
+  -v $(pwd)/printer-config:/app/printer-config \
+  --name printrelay \
+  ghcr.io/taylor8484/print-relay:latest
+```
+
+### Option B: Build from Source
+
+For the latest unreleased changes or local development:
+
+**1. Clone the Repository**
 ```bash
 git clone https://github.com/Taylor8484/Print-Relay
 cd Print-Relay
 ```
 
-### 2. Build the Docker Image
+**2. Deploy with Docker Compose**
 ```bash
-docker build -t printrelay .
+docker-compose up -d
 ```
 
-### 3. Run the Container
+**That's it!** Docker Compose will build and start PrintRelay with:
+- Persistent printer configuration
+- CUPS integration
+- mDNS network discovery
+- Automatic container restart
+
+**Alternative: Deploy with Docker CLI**
 ```bash
+# Build the image
+docker build -t printrelay .
+
+# Run the container with persistent config
 docker run -d \
   --network=host \
   -v /var/run/cups:/var/run/cups \
+  -v $(pwd)/printer-config:/app/printer-config \
   --name printrelay \
   printrelay
 ```
 
 **Note:** Using `--network=host` enables mDNS discovery across your local network.
 
-### 4. Access the Application
+### 3. Access the Application
 
 **On the same machine:**
 - `http://localhost:5000`
@@ -71,6 +115,162 @@ docker run -d \
 **From other devices on your network:**
 - `http://printrelay.local:5000` (via mDNS/Bonjour)
 - `http://<server-ip>:5000` (if mDNS doesn't work)
+
+---
+
+## Updating PrintRelay
+
+When new versions of PrintRelay are released, you can update your installation to get the latest features and bug fixes. Your printer configuration will be preserved across updates.
+
+### If Using Pre-Built Images (Fastest)
+
+Simply pull the latest image and restart:
+
+```bash
+# Pull the latest image
+docker pull ghcr.io/taylor8484/print-relay:latest
+
+# Restart the container
+docker-compose -f docker-compose.prebuilt.yml up -d
+
+# Or with Docker CLI
+docker stop printrelay && docker rm printrelay
+docker run -d \
+  --network=host \
+  -v /var/run/cups:/var/run/cups \
+  -v $(pwd)/printer-config:/app/printer-config \
+  --name printrelay \
+  ghcr.io/taylor8484/print-relay:latest
+```
+
+### If Building from Source
+
+### Method 1: Automated Update (Recommended)
+
+The easiest way to update is using the included update script:
+
+```bash
+cd /path/to/Print-Relay
+./update.sh
+```
+
+This script will:
+1. Pull the latest code from GitHub
+2. Stop the current container
+3. Rebuild the Docker image
+4. Start the updated container
+5. Verify the deployment
+
+### Method 2: Docker Compose (Manual)
+
+If you're using Docker Compose:
+
+```bash
+cd /path/to/Print-Relay
+
+# Pull latest changes
+git pull origin main
+
+# Rebuild and restart
+docker-compose down
+docker-compose build --no-cache
+docker-compose up -d
+
+# Verify it's running
+docker-compose ps
+docker-compose logs -f
+```
+
+### Method 3: Docker CLI (Manual)
+
+If you're using Docker commands directly:
+
+```bash
+cd /path/to/Print-Relay
+
+# Pull latest changes
+git pull origin main
+
+# Stop and remove old container
+docker stop printrelay
+docker rm printrelay
+
+# Rebuild the image
+docker build -t printrelay .
+
+# Start new container with persistent config
+docker run -d \
+  --network=host \
+  -v /var/run/cups:/var/run/cups \
+  -v $(pwd)/printer-config:/app/printer-config \
+  --name printrelay \
+  printrelay
+
+# Check logs
+docker logs -f printrelay
+```
+
+### Configuration Persistence
+
+Your printer selection and settings are stored in the `./printer-config/` directory on your host machine. This directory is automatically:
+
+- Created when you first run PrintRelay
+- Mounted as a volume in the Docker container
+- Preserved when you update or restart the container
+
+**Important:** Do not delete the `printer-config` directory or your saved printer selection will be lost.
+
+### Checking Your Current Version
+
+To see what version you're running:
+
+```bash
+# Check your current git commit
+cd /path/to/Print-Relay
+git log -1 --oneline
+
+# Check latest available version
+git fetch origin
+git log origin/main -1 --oneline
+```
+
+### Rolling Back an Update
+
+If an update causes issues, you can roll back to a previous version:
+
+```bash
+# View commit history
+git log --oneline
+
+# Roll back to a specific commit
+git checkout <commit-hash>
+
+# Rebuild and restart
+docker-compose down
+docker-compose build --no-cache
+docker-compose up -d
+
+# Or return to latest version
+git checkout main
+git pull origin main
+```
+
+### Troubleshooting Updates
+
+**Update script fails:**
+- Ensure you have git installed: `git --version`
+- Make sure you're in the PrintRelay directory
+- Check file permissions: `chmod +x update.sh`
+
+**Container won't start after update:**
+- Check logs: `docker-compose logs` or `docker logs printrelay`
+- Verify CUPS is running: `systemctl status cups`
+- Ensure ports aren't in use: `sudo lsof -i :5000`
+
+**Configuration lost after update:**
+- Check if `printer-config` directory exists in your PrintRelay folder
+- Verify the volume mount in your docker-compose.yml or run command
+- Re-mount the volume and restart: `docker-compose down && docker-compose up -d`
 
 ---
 
@@ -309,11 +509,17 @@ Before exposing PrintRelay remotely, ensure:
 
 ### Example Configuration
 
-**For Docker deployment (with mDNS):**
+**For Docker Compose deployment (recommended):**
+```bash
+docker-compose up -d
+```
+
+**For Docker CLI deployment (with mDNS):**
 ```bash
 docker run -d \
   --network=host \
   -v /var/run/cups:/var/run/cups \
+  -v $(pwd)/printer-config:/app/printer-config \
   --name printrelay \
   printrelay
 ```
@@ -323,6 +529,7 @@ docker run -d \
 docker run -d \
   -p 5000:5000 \
   -v /var/run/cups:/var/run/cups \
+  -v $(pwd)/printer-config:/app/printer-config \
   --name printrelay \
   printrelay
 ```
@@ -375,27 +582,44 @@ Note: You may want to configure Vite proxy to avoid CORS issues during developme
 
 ## Building for Production
 
-### Docker Build (Recommended)
+### Docker Compose (Recommended)
 
-The recommended deployment method is using Docker:
+The easiest deployment method is using Docker Compose:
+
+```bash
+# Build and start in one command
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop
+docker-compose down
+```
+
+### Docker CLI (Alternative)
+
+If you prefer Docker commands directly:
 
 ```bash
 # Build the multi-stage Docker image
 docker build -t printrelay .
 
-# Run the container (with mDNS support)
+# Run the container (with mDNS support and persistent config)
 docker run -d \
   --network=host \
   -v /var/run/cups:/var/run/cups \
+  -v $(pwd)/printer-config:/app/printer-config \
   --name printrelay \
   printrelay
 ```
 
-The Docker build:
+The Docker build process:
 1. Stage 1: Builds the React frontend with Vite
 2. Stage 2: Creates production image with Node.js + CUPS client
-3. Installs backend dependencies (Express, multer, node-persist)
+3. Installs backend dependencies (Express, multer, node-persist, bonjour)
 4. Copies built frontend and serves it via Express
+5. Configures persistent storage for printer settings
 
 ### Manual Deployment (Without Docker)
 
